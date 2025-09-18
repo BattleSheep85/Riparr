@@ -1,0 +1,122 @@
+version: '3.9'
+
+services:
+  redis:
+    image: redis:PLACEHOLDER
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  drive-watcher:
+    image: riparr/drive-watcher:PLACEHOLDER
+    container_name: drive-watcher
+    environment:
+      - WATCH_PATH=/data
+      - REDIS_URL=redis://redis:6379
+      # add more env vars as needed
+    volumes:
+      - data-volume:/data
+      - logs-volume:/logs/drive-watcher
+    depends_on:
+      - redis
+
+  rip-worker:
+    image: riparr/rip-worker:PLACEHOLDER
+    container_name: rip-worker
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - MODELS_PATH=/models
+      # add more env vars as needed
+    volumes:
+      - data-volume:/data
+      - models-volume:/models
+      - logs-volume:/logs/rip-worker
+    depends_on:
+      - redis
+      - drive-watcher
+
+  enhance-worker:
+    image: riparr/enhance-worker:PLACEHOLDER
+    container_name: enhance-worker
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - MODELS_PATH=/models
+    volumes:
+      - data-volume:/data
+      - models-volume:/models
+      - logs-volume:/logs/enhance-worker
+    depends_on:
+      - redis
+      - rip-worker
+
+  metadata-worker:
+    image: riparr/metadata-worker:PLACEHOLDER
+    container_name: metadata-worker
+    environment:
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - data-volume:/data
+      - logs-volume:/logs/metadata-worker
+    depends_on:
+      - redis
+      - rip-worker
+
+  orchestrator:
+    image: riparr/orchestrator:PLACEHOLDER
+    container_name: orchestrator
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - UI_GATEWAY_URL=http://ui-gateway:PORT_PLACEHOLDER
+    volumes:
+      - logs-volume:/logs/orchestrator
+    depends_on:
+      - redis
+      - drive-watcher
+      - rip-worker
+      - enhance-worker
+      - metadata-worker
+
+  ui-gateway:
+    image: riparr/ui-gateway:PLACEHOLDER
+    container_name: ui-gateway
+    environment:
+      - PORT=8080
+      # other env vars
+    ports:
+      - "8080:8080"
+    volumes:
+      - logs-volume:/logs/ui-gateway
+    depends_on:
+      - orchestrator
+
+  log-stream:
+    image: riparr/log-stream:PLACEHOLDER
+    container_name: log-stream
+    environment:
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "9000:9000"
+    depends_on:
+      - redis
+
+  ollama:
+    image: ollama/ollama:PLACEHOLDER
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - models-volume:/models
+    # environment: add model, memory allocation etc.
+
+volumes:
+  data-volume:
+    driver: local
+  models-volume:
+    driver: local
+  logs-volume:
+    driver: local
+  redis-data:
+    driver: local
