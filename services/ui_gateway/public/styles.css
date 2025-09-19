@@ -1,0 +1,124 @@
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #f4f4f4;
+  color: #333;
+}
+
+header {
+  background-color: #007bff;
+  color: white;
+  padding: 1rem;
+  text-align: center;
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+section {
+  background-color: white;
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+h2 {
+  margin-top: 0;
+}
+
+#job-list {
+  list-style: none;
+  padding: 0;
+}
+
+.job-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  border-bottom: 1px solid #eee;
+}
+
+.job-item:last-child {
+  border-bottom: none;
+}
+
+.job-info {
+  flex-grow: 1;
+}
+
+.job-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+button {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background-color: #007bff;
+  color: white;
+}
+
+button:hover {
+  background-color: #0056b3;
+}
+
+button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+#log-container {
+  max-height: 400px;
+  overflow-y: auto;
+  background-color: #f8f8f8;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  font-family: monospace;
+  white-space: pre-wrap;
+}
+
+.log-entry {
+  margin-bottom: 0.25rem;
+}
+
+#service-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.service-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.service-toggle input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+}
+
+@media (min-width: 768px) {
+  main {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  section {
+    flex: 1 1 300px;
+  }
+
+  #logs {
+    flex: 1 1 100%;
+  }
+}

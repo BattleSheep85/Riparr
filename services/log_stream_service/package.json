@@ -1,0 +1,13 @@
+{
+  "name": "log-stream-service",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.0",
+    "redis": "^4.6.0",
+    "cors": "^2.8.5"
+  }
+}

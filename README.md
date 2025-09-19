@@ -15,13 +15,13 @@
 ## Getting Started
 
 1. **Prerequisites**
-   - Docker Desktop (or Docker Engine) with **GPU support** (AMD VAAPI recommended).
-   - An optical drive that can be passed through to containers.
+   - Docker Desktop (or Docker Engine) with **GPU support** (AMD VAAPI recommended).  
+   - An optical drive that can be passed through to containers.  
    - `git` installed for version control.
 
 2. **Clone the Repository**
    ```bash
-   git clone https://github.com/your‑username/riparr.git
+   git clone https://github.com/your-username/riparr.git
    cd riparr
    ```
 
@@ -30,16 +30,61 @@
    mkdir -p docs validation_results data config
    ```
 
-4. **Review the Docker Compose File**
-   The repository contains a minimal `docker-compose.yml`. Adjust volume mounts, device mappings, and environment variables to match your host setup.
+4. **Configure Environment Variables**
+   Create a `.env` file in the project root (or export variables in your shell) to enable the desired services and set runtime options:
 
-5. **Start the Stack**
+   ```dotenv
+   # Service toggles (set to true to enable)
+   ENABLE_DRIVE_WATCHER=true
+   ENABLE_RIP=true
+   ENABLE_ENHANCE=true
+   ENABLE_TRANSCODE=true
+   ENABLE_METADATA=true
+   ENABLE_UI=true
+
+   # Redis connection (default works with docker‑compose)
+   REDIS_HOST=redis
+   REDIS_PORT=6379
+
+   # Paths inside containers
+   MKV_OUTPUT_DIR=/data/rips
+   ENHANCED_OUTPUT_DIR=/data/enhanced
+   TRANSCODED_OUTPUT_DIR=/data/transcoded
+   METADATA_DIR=/data/metadata
+   BLACKHOLE_PATH=/media/plex
+
+   # GPU / model settings
+   GPU_VENDOR=amd
+   ESRGAN_PROFILE=amd-4x-med-vram4
+   VAAPI_PROFILE=hevc_vaapi
+   TRANSCODE_PROFILE=high
+   AUDIO_FORMAT=aac
+   ```
+
+5. **Review the Docker Compose File**
+   The repository contains a minimal `docker-compose.yml`. Adjust volume mounts, device mappings, and any additional environment variables to match your host setup (e.g., map `/dev/dri` for GPU access).
+
+6. **Start the Stack**
    ```bash
    docker compose up -d
    ```
 
-6. **Open the UI**
-   Navigate to `http://localhost:8080` (default UI port) to monitor jobs, view live logs, and control the pipeline.
+   Docker will pull/build the service images, start Redis, and launch each micro‑service container. Logs can be inspected with `docker compose logs -f <service>`.
+
+7. **Open the UI**
+   Navigate to `http://localhost:8080` (default UI port) to monitor jobs, view live logs, and control the pipeline (pause, cancel, toggle services).
+
+8. **Running the Test Suite**
+   ```bash
+   pip install -r tests/requirements.txt
+   pytest tests/
+   ```
+   Test results are stored in `validation_results/` and are also displayed in the CI pipeline.
+
+9. **Stopping the Stack**
+   ```bash
+   docker compose down
+   ```
 
 ## Development Workflow
 

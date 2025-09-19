@@ -1,0 +1,46 @@
+services:
+  drive_watcher:
+    enable: true
+    watch_path: "/data"
+  rip_worker:
+    enable: true
+    mkv_output_dir: "/data/rips"
+    title_selection: "all"
+    subtitle_policy: "retain"
+    audio_policy: "retain"
+  enhance_worker:
+    enable: true
+    esrgan_profile: "amd-4x-med-vram4"
+    gpu_vendor: "amd"
+    enhanced_output_dir: "/data/enhanced"
+    models_dir: "/models"
+    cpu_fallback: false
+  transcode_worker:
+    enable: true
+    vaapi_profile: "hevc_vaapi"
+    transcode_profile: "high"
+    enhanced_output_dir: "/data/enhanced"
+    transcoded_output_dir: "/data/transcoded"
+    cpu_fallback: false
+    audio_format: "aac"
+  metadata_worker:
+    enable: true
+    ollama_model: "llama2"
+    metadata_dir: "/data/metadata"
+  blackhole_integration:
+    enable: true
+    blackhole_path: "/media/plex"
+    cleanup: true
+  ui_gateway:
+    enable: true
+    port: 8080
+  log_stream_service:
+    enable: true
+    log_level: "info"
+    redis_log_stream: "logs"
+
+redis:
+  url: "redis://redis:6379"
+
+docker:
+  socket: "/var/run/docker.sock"

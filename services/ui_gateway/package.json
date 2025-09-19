@@ -1,0 +1,14 @@
+{
+  "name": "ui-gateway",
+  "version": "1.0.0",
+  "description": "Web UI Gateway for Riparr services",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "redis": "^4.6.8",
+    "cors": "^2.8.5"
+  }
+}

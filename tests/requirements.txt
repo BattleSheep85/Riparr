@@ -1,0 +1,5 @@
+pytest>=7.0.0
+redis>=4.0.0
+docker>=6.0.0
+requests>=2.25.0
+psutil>=5.8.0

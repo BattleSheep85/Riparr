@@ -6,7 +6,7 @@ The table below tracks the status of each major task. Update the **Status** colu
 |---|------|--------|
 | 1 | Use Context7 to retrieve Ollama API docs and confirm availability of a small local model comparable to Exaone 4 1.2B | Completed |
 | 2 | Use Context7 to retrieve Real‑ESRGAN NCNN Vulkan docs and container usage patterns | Completed |
-| 3 | Use Context7 to retrieve FFmpeg hardware acceleration docs prioritizing VAAPI for AMD (hevc_vaapi), include AMF notes, map CRF‑like quality, and document /dev/dri permissions | In Progress |
+| 3 | Use Context7 to retrieve FFmpeg hardware acceleration docs prioritizing VAAPI for AMD (hevc_vaapi), include AMF notes, map CRF‑like quality, and document /dev/dri permissions | Completed |
 | 4 | Use Context7 to retrieve HandBrake CLI docs for profile templating and passthrough constraints | Pending |
 | 5 | Draft service boundaries and contracts for Drive Watcher, Rip Worker, Enhance Worker, Metadata Worker, Orchestrator, UI Gateway, and Log Stream | Completed |
 | 6 | Define durable job schemas for rip, encode, enhance, and serve including idempotency keys, progress events, and error taxonomy | Completed |
@@ -17,9 +17,9 @@ The table below tracks the status of each major task. Update the **Status** colu
 |11 | Create Rip Worker design for MakeMKV CLI invocation, title selection policy, and progress parsing | Completed |
 |12 | Decide rip policy defaults remux only vs optional transcode, and subtitle and audio retention rules | Completed |
 |13 | Create Enhance Worker design using Real‑ESRGAN NCNN Vulkan with pluggable denoise and scaling profiles plus CPU fallback | Completed |
-|14 | Define 4K upscaling profiles and quality presets for enhancement (2x/4x, denoise levels, tiling for VRAM), AMD‑first | Pending |
+|14 | Define 4K upscaling profiles and quality presets for enhancement (2x/4x, denoise levels, tiling for VRAM), AMD‑first | Completed |
 |15 | Approve HDR handling policy: HDR content skips AI upscaler; use VAAPI 10‑bit scaling to 4K preserving HDR10. SDR uses Real‑ESRGAN upscaler. | Completed |
-|16 | Define transcode profiles using FFmpeg (hevc_vaapi) with CPU fallback; map CRF‑like quality; audio pass‑through + EAC3/AAC/OPUS downmix policy | Pending |
+|16 | Define transcode profiles using FFmpeg (hevc_vaapi) with CPU fallback; map CRF‑like quality; audio pass‑through + EAC3/AAC/OPUS downmix policy | Completed |
 |17 | Create Metadata Worker design that calls Ollama to normalize names and build directory and file patterns | Completed |
 |18 | Define blackhole integration contract target directory, sidecar metadata files if needed, and move semantics | Completed |
 |19 | Design central log stream structure with per‑job correlation and severity and streaming to UI | Completed |

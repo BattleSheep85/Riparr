@@ -1,6 +1,31 @@
 version: '3.9'
 
 services:
+  test-runner:
+    build: ./tests
+    container_name: riparr-test-runner
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./tests:/tests
+      - ./validation_results:/validation_results
+    depends_on:
+      - redis
+      - drive-watcher
+      - rip-worker
+      - enhance-worker
+      - transcode-worker
+      - metadata-worker
+      - blackhole
+      - ui-gateway
+      - log-stream
+      - orchestrator
+    networks:
+      - riparr-network
+
+  # Include all services from main compose for testing
   redis:
     image: redis:alpine
     container_name: redis
@@ -9,6 +34,8 @@ services:
       - "6379:6379"
     volumes:
       - redis-data:/data
+    networks:
+      - riparr-network
 
   drive-watcher:
     image: riparr/drive-watcher:latest
@@ -16,121 +43,130 @@ services:
     environment:
       - WATCH_PATH=/data
       - REDIS_URL=redis://redis:6379
-       - ENABLE_ENHANCE=true
+      - ENABLE_ENHANCE=true
       - ESRGAN_PROFILE=amd-4x-med-vram4
       - GPU_VENDOR=amd
       - ENHANCED_OUTPUT_DIR=/data/enhanced
       - MODELS_DIR=/models
       - CPU_FALLBACK=false
-       - MKV_OUTPUT_DIR=/data/rips
-       - TITLE_SELECTION=all
-       - SUBTITLE_POLICY=retain
-       - AUDIO_POLICY=retain
+      - MKV_OUTPUT_DIR=/data/rips
+      - TITLE_SELECTION=all
+      - SUBTITLE_POLICY=retain
+      - AUDIO_POLICY=retain
     volumes:
       - data-volume:/data
       - logs-volume:/logs/drive-watcher
     depends_on:
       - redis
+    networks:
+      - riparr-network
 
   rip-worker:
     build: ./services/rip_worker
     container_name: rip-worker
     environment:
       - REDIS_URL=redis://redis:6379
-       - ENABLE_ENHANCE=true
+      - ENABLE_ENHANCE=true
       - ESRGAN_PROFILE=amd-4x-med-vram4
       - GPU_VENDOR=amd
       - ENHANCED_OUTPUT_DIR=/data/enhanced
       - MODELS_DIR=/models
       - CPU_FALLBACK=false
-       - MKV_OUTPUT_DIR=/data/rips
-       - TITLE_SELECTION=all
-       - SUBTITLE_POLICY=retain
-       - AUDIO_POLICY=retain
-      
+      - MKV_OUTPUT_DIR=/data/rips
+      - TITLE_SELECTION=all
+      - SUBTITLE_POLICY=retain
+      - AUDIO_POLICY=retain
     volumes:
       - data-volume:/data
       - models-volume:/models
       - logs-volume:/logs/rip-worker
+    devices:
+      - /dev/sr0:/dev/sr0:rwm  # Optical drive access
     depends_on:
       - redis
       - drive-watcher
+    networks:
+      - riparr-network
 
   enhance-worker:
     build: ./services/enhance_worker
     container_name: enhance-worker
     environment:
       - REDIS_URL=redis://redis:6379
-       - ENABLE_ENHANCE=true
+      - ENABLE_ENHANCE=true
       - ESRGAN_PROFILE=amd-4x-med-vram4
       - GPU_VENDOR=amd
       - ENHANCED_OUTPUT_DIR=/data/enhanced
       - MODELS_DIR=/models
       - CPU_FALLBACK=false
-       - MKV_OUTPUT_DIR=/data/rips
-       - TITLE_SELECTION=all
-       - SUBTITLE_POLICY=retain
-       - AUDIO_POLICY=retain
-      
+      - MKV_OUTPUT_DIR=/data/rips
+      - TITLE_SELECTION=all
+      - SUBTITLE_POLICY=retain
+      - AUDIO_POLICY=retain
     volumes:
       - data-volume:/data
       - models-volume:/models
     devices:
-      - /dev/dri:/dev/dri
-      - logs-volume:/logs/enhance-worker
+      - /dev/dri:/dev/dri:rwm  # GPU access
     depends_on:
       - redis
       - rip-worker
+    networks:
+      - riparr-network
 
   transcode-worker:
     build: ./services/transcode_worker
     container_name: transcode-worker
     environment:
       - REDIS_URL=redis://redis:6379
-       - ENABLE_TRANSCODE=true
-       - VAAPI_PROFILE=hevc_vaapi
-       - TRANSCODE_PROFILE=high
-       - ENHANCED_OUTPUT_DIR=/data/enhanced
-       - TRANSCODED_OUTPUT_DIR=/data/transcoded
-       - CPU_FALLBACK=false
-       - AUDIO_FORMAT=aac
+      - ENABLE_TRANSCODE=true
+      - VAAPI_PROFILE=hevc_vaapi
+      - TRANSCODE_PROFILE=high
+      - ENHANCED_OUTPUT_DIR=/data/enhanced
+      - TRANSCODED_OUTPUT_DIR=/data/transcoded
+      - CPU_FALLBACK=false
+      - AUDIO_FORMAT=aac
     volumes:
       - data-volume:/data
       - logs-volume:/logs/transcode-worker
     devices:
-      - /dev/dri:/dev/dri
+      - /dev/dri:/dev/dri:rwm
     depends_on:
       - redis
       - enhance-worker
+    networks:
+      - riparr-network
 
   metadata-worker:
     image: riparr/metadata-worker:latest
     container_name: metadata-worker
     environment:
       - REDIS_URL=redis://redis:6379
-       - ENABLE_ENHANCE=true
+      - ENABLE_ENHANCE=true
       - ESRGAN_PROFILE=amd-4x-med-vram4
       - GPU_VENDOR=amd
       - ENHANCED_OUTPUT_DIR=/data/enhanced
       - MODELS_DIR=/models
       - CPU_FALLBACK=false
-       - MKV_OUTPUT_DIR=/data/rips
-       - TITLE_SELECTION=all
-       - SUBTITLE_POLICY=retain
-       - AUDIO_POLICY=retain
+      - MKV_OUTPUT_DIR=/data/rips
+      - TITLE_SELECTION=all
+      - SUBTITLE_POLICY=retain
+      - AUDIO_POLICY=retain
     volumes:
       - data-volume:/data
       - logs-volume:/logs/metadata-worker
     depends_on:
       - redis
       - rip-worker
+    networks:
+      - riparr-network
 
   blackhole:
     build: ./services/blackhole_integration
     container_name: blackhole
     environment:
       - REDIS_URL=redis://redis:6379
-       - ENABLE_BLACKHOLE=true
+      - ENABLE_BLACKHOLE=true
       - BLACKHOLE_PATH=/media/plex
       - CLEANUP=true
     volumes:
@@ -140,6 +176,8 @@ services:
     depends_on:
       - redis
       - metadata-worker
+    networks:
+      - riparr-network
 
   ui-gateway:
     image: riparr/ui-gateway:latest
@@ -152,41 +190,47 @@ services:
       - logs-volume:/logs/ui-gateway
     depends_on:
       - orchestrator
+    networks:
+      - riparr-network
 
   log-stream:
     image: riparr/log-stream:latest
     container_name: log-stream
     environment:
       - REDIS_URL=redis://redis:6379
-       - ENABLE_ENHANCE=true
+      - ENABLE_ENHANCE=true
       - ESRGAN_PROFILE=amd-4x-med-vram4
       - GPU_VENDOR=amd
       - ENHANCED_OUTPUT_DIR=/data/enhanced
       - MODELS_DIR=/models
       - CPU_FALLBACK=false
-       - MKV_OUTPUT_DIR=/data/rips
-       - TITLE_SELECTION=all
-       - SUBTITLE_POLICY=retain
-       - AUDIO_POLICY=retain
+      - MKV_OUTPUT_DIR=/data/rips
+      - TITLE_SELECTION=all
+      - SUBTITLE_POLICY=retain
+      - AUDIO_POLICY=retain
     ports:
       - "9000:9000"
     volumes:
       - logs-volume:/logs/log-stream
     depends_on:
       - redis
+    networks:
+      - riparr-network
 
   orchestrator:
-     build: ./services/orchestrator
-     container_name: orchestrator
-     environment:
-       - REDIS_URL=redis://redis:6379
-       - CONFIG_PATH=/config/config.yaml
-     volumes:
-       - ./config.yaml:/config/config.yaml:ro
-       - /var/run/docker.sock:/var/run/docker.sock
-       - logs-volume:/logs/orchestrator
-     depends_on:
-       - redis
+    build: ./services/orchestrator
+    container_name: orchestrator
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - CONFIG_PATH=/config/config.yaml
+    volumes:
+      - ./config.yaml:/config/config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - logs-volume:/logs/orchestrator
+    depends_on:
+      - redis
+    networks:
+      - riparr-network
 
   ollama:
     image: ollama/ollama:latest
@@ -200,6 +244,8 @@ services:
       - models-volume:/models
     devices:
       - /dev/dri:/dev/dri
+    networks:
+      - riparr-network
 
 volumes:
   data-volume:
@@ -214,3 +260,7 @@ volumes:
     driver: local
   blackhole-volume:
     driver: local
+
+networks:
+  riparr-network:
+    driver: bridge
