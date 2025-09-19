@@ -1,0 +1,26 @@
+# Docker artefacts
+docker-compose.override.yml
+*.log
+
+# Media files
+data/
+validation_results/
+
+# Secrets
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Node.js (if any)
+node_modules/
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
