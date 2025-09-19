@@ -3,11 +3,17 @@ import json
 import os
 import sys
 import shutil
+import logging
+from typing import Dict, List, Any
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # Check if service is enabled
 enable = os.getenv('ENABLE_BLACKHOLE', 'false').lower() == 'true'
 if not enable:
-    print("Blackhole Integration disabled, exiting.")
+    logger.info("Blackhole Integration disabled, exiting.")
     sys.exit(0)
 
 # Redis connection
@@ -16,10 +22,9 @@ r = redis.from_url(redis_url, decode_responses=True)
 
 # Config
 blackhole_path = os.getenv('BLACKHOLE_PATH', '/media/plex')
-cleanup = os.getenv('CLEANUP', 'true').lower() == 'true'
 os.makedirs(blackhole_path, exist_ok=True)
 
-def create_sidecar_nfo(metadata, target_dir):
+def create_sidecar_nfo(metadata: Dict[str, Any], target_dir: str) -> str:
     nfo_path = os.path.join(target_dir, f"{metadata['normalized_title']}.nfo")
     with open(nfo_path, 'w') as f:
         f.write(f"Title: {metadata['normalized_title']}\n")
@@ -27,7 +32,7 @@ def create_sidecar_nfo(metadata, target_dir):
         f.write(f"Job ID: {metadata['job_id']}\n")
     return nfo_path
 
-def process_metadata_complete(job_id, metadata_list):
+def process_metadata_complete(job_id: str, metadata_list: List[Dict[str, Any]]) -> None:
     moved_files = []
     for metadata in metadata_list:
         original_file = metadata['original_file']
@@ -45,11 +50,6 @@ def process_metadata_complete(job_id, metadata_list):
         
         # Create side-car .nfo
         create_sidecar_nfo(metadata, target_dir)
-        
-        # Cleanup if enabled
-        if cleanup:
-            # Original file already moved, but if there are other files like metadata JSON, could clean them
-            pass
     
     # Publish complete
     complete_msg = {
@@ -57,9 +57,9 @@ def process_metadata_complete(job_id, metadata_list):
         "moved_files": moved_files
     }
     r.xadd('blackhole_events', {'event': 'complete', 'data': json.dumps(complete_msg)})
-    print(f"Published blackhole.complete for job {job_id}")
+    logger.info(f"Published blackhole.complete for job {job_id}")
 
-def process_metadata_event(data):
+def process_metadata_event(data: Dict[str, Any]) -> None:
     if data.get('event') == 'complete':
         job_id = data['job_id']
         metadata_list = data['metadata']
@@ -70,12 +70,12 @@ def process_metadata_event(data):
             "metadata": metadata_list
         }
         r.xadd('blackhole_events', {'event': 'start', 'data': json.dumps(start_msg)})
-        print(f"Published blackhole.start for job {job_id}")
+        logger.info(f"Published blackhole.start for job {job_id}")
         
         # Process
         process_metadata_complete(job_id, metadata_list)
 
-def main():
+def main() -> None:
     last_id = '0'
     while True:
         try:
@@ -85,11 +85,19 @@ def main():
                     last_id = msg_id
                     data = json.loads(msg['data'])
                     process_metadata_event(data)
+        except (redis.ConnectionError, redis.TimeoutError) as e:
+            logger.error(f"Redis connection error: {e}")
+            import time
+            time.sleep(1)
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error: {e}")
+            import time
+            time.sleep(1)
         except Exception as e:
-            print(f"Error reading stream: {e}")
+            logger.error(f"Unexpected error in main loop: {e}")
             import time
             time.sleep(1)
 
 if __name__ == '__main__':
-    print("Blackhole Integration started, waiting for metadata events...")
+    logger.info("Blackhole Integration started, waiting for metadata events...")
     main()

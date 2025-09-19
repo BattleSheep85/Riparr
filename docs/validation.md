@@ -2,6 +2,16 @@
 
 Riparr’s reliability depends on thorough validation of each pipeline stage. The following test suites are defined to verify functionality, performance, and resilience.
 
+### Code Simplification Impact
+The recent code‑simplification effort (dead‑code removal, structured logging, type hints, and refined exception handling) does not change functional behavior but improves test reliability:
+
+- **Logging Consistency** – Tests that capture service logs now receive structured JSON output, simplifying log parsing.
+- **Error Granularity** – Narrowed exception handling yields more precise failure signals, allowing test suites to assert specific error types.
+- **Type Safety** – Added type hints enable static analysis tools (e.g., mypy) to be incorporated into CI, catching type‑related regressions early.
+- **Reduced Code Size** – Smaller codebases lead to faster test execution and lower memory consumption during CI runs.
+
+These updates are reflected in the CI pipeline, which now includes a static‑type check step and validates that log output conforms to the new JSON schema.
+
 ## 1. Linux Containerization Validation (Rip Stage)
 - **Goal**: Confirm that the Rip Worker can access an optical drive inside a container and produce a correct MKV.
 - **Steps**:

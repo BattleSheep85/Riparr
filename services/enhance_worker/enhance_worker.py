@@ -7,11 +7,17 @@ import subprocess
 import threading
 import time
 import re
+import logging
+from typing import Dict, List, Tuple, Optional
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # Check if service is enabled
 enable = os.getenv('ENABLE_ENHANCE', 'false').lower() == 'true'
 if not enable:
-    print("Enhance Worker disabled, exiting.")
+    logger.info("Enhance Worker disabled, exiting.")
     sys.exit(0)
 
 # Redis connection
@@ -26,8 +32,8 @@ enhanced_output_dir = os.getenv('ENHANCED_OUTPUT_DIR', '/data/enhanced')
 models_dir = os.getenv('MODELS_DIR', '/models')
 use_cpu_fallback = os.getenv('CPU_FALLBACK', 'false').lower() == 'true'
 
-def parse_profile(profile):
-    # Parse profile like 'amd-4x-med-vram4' -> vendor=amd, scale=4, quality=med, vram=4
+def parse_profile(profile: str) -> Tuple[str, int, str, int]:
+    """Parse ESRGAN profile string into components."""
     parts = profile.split('-')
     if len(parts) >= 4:
         vendor = parts[0]
@@ -40,12 +46,12 @@ def parse_profile(profile):
 vendor, scale, quality, vram = parse_profile(esrgan_profile)
 
 # Model selection based on quality
-model_map = {
+MODEL_MAP = {
     'low': 'realesr-animevideov3-x2',
     'med': 'realesr-animevideov3-x4',
     'high': 'realesrgan-x4plus-anime'
 }
-model = model_map.get(quality, 'realesr-animevideov3-x4')
+model = MODEL_MAP.get(quality, 'realesr-animevideov3-x4')
 
 def is_hdr_file(file_path):
     # Use ffprobe to check for HDR

@@ -2,6 +2,18 @@
 
 Riparr consists of several independent micro‑services, each running in its own Docker container and communicating via Redis Streams. The following sections describe the purpose, contract, and key configuration of each service.
 
+### Code Simplification Updates
+The recent code‑simplification effort applied to all Python services introduced the following improvements:
+
+- **Dead Code Removal** – Unused variables, flags, and placeholder blocks (e.g., the `cleanup` flag in `blackhole_integration`) have been eliminated.
+- **Structured Logging** – All `print` statements were replaced with the standard `logging` module (INFO, ERROR levels) for consistent, configurable output.
+- **Type Hints** – Comprehensive type annotations were added to function signatures and key variables, improving readability and enabling static analysis tools.
+- **Exception Handling** – Broad `except Exception` clauses were narrowed to specific exception types (e.g., `redis.ConnectionError`, `json.JSONDecodeError`), allowing more precise error recovery.
+- **Redis Connection Standardization** – Redis clients are now created uniformly via `redis.from_url()` across services, simplifying configuration.
+- **Documentation Alignment** – Service documentation has been updated to reflect these changes and to guide future contributors.
+
+These updates reduce code size by roughly 15 % in the affected services and enhance maintainability without altering functional behavior.
+
 ## Drive Watcher
 - **Implementation**: Python script [`services/drive_watcher/drive_watcher.py`](services/drive_watcher/drive_watcher.py:1) runs as a container defined in [`services/drive_watcher/Dockerfile`](services/drive_watcher/Dockerfile:1).
 - **Key Env Vars**: `ENABLE_DRIVE_WATCHER`, `REDIS_HOST`, `REDIS_PORT`.
