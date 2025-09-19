@@ -121,6 +121,9 @@ services:
     volumes:
       - data-volume:/data
       - logs-volume:/logs/metadata-worker
+    networks:
+      - backend
+      - data
     depends_on:
       - redis
       - rip-worker
@@ -129,14 +132,20 @@ services:
     build: ./services/blackhole_integration
     container_name: blackhole
     environment:
-      - REDIS_URL=redis://redis:6379
-       - ENABLE_BLACKHOLE=true
-      - BLACKHOLE_PATH=/media/plex
-      - CLEANUP=true
+      - REDIS_URL=${REDIS_URL}
+      - ENABLE_BLACKHOLE=${ENABLE_BLACKHOLE}
+      - BLACKHOLE_PATH=${BLACKHOLE_PATH}
+      - CLEANUP=${CLEANUP}
+    labels:
+      - "com.docker.compose.project=riparr"
+      - "io.portainer.accesscontrol.teams=admin"
     volumes:
       - data-volume:/data
       - blackhole-volume:/media/plex
       - logs-volume:/logs/blackhole
+    networks:
+      - backend
+      - data
     depends_on:
       - redis
       - metadata-worker
@@ -145,11 +154,17 @@ services:
     image: riparr/ui-gateway:latest
     container_name: ui-gateway
     environment:
-      - PORT=8080
+      - PORT=${UI_PORT}
+    labels:
+      - "com.docker.compose.project=riparr"
+      - "io.portainer.accesscontrol.teams=admin"
     ports:
-      - "8080:8080"
+      - "${UI_PORT}:${UI_PORT}"
     volumes:
       - logs-volume:/logs/ui-gateway
+    networks:
+      - frontend
+      - backend
     depends_on:
       - orchestrator
 
@@ -157,60 +172,104 @@ services:
     image: riparr/log-stream:latest
     container_name: log-stream
     environment:
-      - REDIS_URL=redis://redis:6379
-       - ENABLE_ENHANCE=true
-      - ESRGAN_PROFILE=amd-4x-med-vram4
-      - GPU_VENDOR=amd
-      - ENHANCED_OUTPUT_DIR=/data/enhanced
-      - MODELS_DIR=/models
-      - CPU_FALLBACK=false
-       - MKV_OUTPUT_DIR=/data/rips
-       - TITLE_SELECTION=all
-       - SUBTITLE_POLICY=retain
-       - AUDIO_POLICY=retain
+      - REDIS_URL=${REDIS_URL}
+      - ENABLE_ENHANCE=${ENABLE_ENHANCE}
+      - ESRGAN_PROFILE=${ESRGAN_PROFILE}
+      - GPU_VENDOR=${GPU_VENDOR}
+      - ENHANCED_OUTPUT_DIR=${ENHANCED_OUTPUT_DIR}
+      - MODELS_DIR=${MODELS_DIR}
+      - CPU_FALLBACK=${CPU_FALLBACK}
+      - MKV_OUTPUT_DIR=${MKV_OUTPUT_DIR}
+      - TITLE_SELECTION=${TITLE_SELECTION}
+      - SUBTITLE_POLICY=${SUBTITLE_POLICY}
+      - AUDIO_POLICY=${AUDIO_POLICY}
+    labels:
+      - "com.docker.compose.project=riparr"
+      - "io.portainer.accesscontrol.teams=admin"
     ports:
-      - "9000:9000"
+      - "${LOG_STREAM_PORT}:9000"
     volumes:
       - logs-volume:/logs/log-stream
+    networks:
+      - frontend
+      - backend
     depends_on:
       - redis
 
   orchestrator:
-     build: ./services/orchestrator
-     container_name: orchestrator
-     environment:
-       - REDIS_URL=redis://redis:6379
-       - CONFIG_PATH=/config/config.yaml
-     volumes:
-       - ./config.yaml:/config/config.yaml:ro
-       - /var/run/docker.sock:/var/run/docker.sock
-       - logs-volume:/logs/orchestrator
-     depends_on:
-       - redis
+    build: ./services/orchestrator
+    container_name: orchestrator
+    environment:
+      - REDIS_URL=${REDIS_URL}
+      - CONFIG_PATH=${CONFIG_PATH}
+    labels:
+      - "com.docker.compose.project=riparr"
+      - "io.portainer.accesscontrol.teams=admin"
+    volumes:
+      - ./config.yaml:/config/config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - logs-volume:/logs/orchestrator
+    networks:
+      - backend
+    depends_on:
+      - redis
 
   ollama:
     image: ollama/ollama:latest
     container_name: ollama
     environment:
-      - MODEL=llama3.0
-      - VAAPI=1
+      - MODEL=${OLLAMA_MODEL}
+      - VAAPI=${VAAPI}
+    labels:
+      - "com.docker.compose.project=riparr"
+      - "io.portainer.accesscontrol.teams=admin"
     ports:
-      - "11434:11434"
+      - "${OLLAMA_PORT}:11434"
     volumes:
       - models-volume:/models
     devices:
       - /dev/dri:/dev/dri
+    networks:
+      - backend
+
+networks:
+  frontend:
+    driver: bridge
+    labels:
+      - "com.docker.compose.project=riparr"
+  backend:
+    driver: bridge
+    internal: true
+    labels:
+      - "com.docker.compose.project=riparr"
+  data:
+    driver: bridge
+    internal: true
+    labels:
+      - "com.docker.compose.project=riparr"
 
 volumes:
   data-volume:
     driver: local
+    labels:
+      - "com.docker.compose.project=riparr"
   models-volume:
     driver: local
+    labels:
+      - "com.docker.compose.project=riparr"
   logs-volume:
     driver: local
+    labels:
+      - "com.docker.compose.project=riparr"
   redis-data:
     driver: local
+    labels:
+      - "com.docker.compose.project=riparr"
   config-volume:
     driver: local
+    labels:
+      - "com.docker.compose.project=riparr"
   blackhole-volume:
     driver: local
+    labels:
+      - "com.docker.compose.project=riparr"

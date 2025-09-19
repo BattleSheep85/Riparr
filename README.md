@@ -132,7 +132,226 @@ Before deploying Riparr, ensure your system meets the following requirements:
    
    # Remove images
    docker compose down --rmi all
-   `` of the final, integrated README.md. All the changes are reflected exactly as they would be.There Riparr – Automated Media Ripping & Enhancement
+   ```
+
+### Portainer Deployment
+
+Portainer provides a web-based UI for managing Docker containers and stacks. The updated `docker-compose.yml` is fully compatible with Portainer and includes proper labels for organization and environment variable configuration.
+
+#### Prerequisites for Portainer Deployment
+
+- Portainer CE or EE installed and running
+- Access to Portainer web interface
+- Docker environment configured in Portainer
+
+#### Stack Creation Steps
+
+1. **Access Portainer Web Interface**
+   - Open your Portainer instance in a web browser
+   - Log in with your administrator credentials
+
+2. **Navigate to Stacks**
+   - Click on "Stacks" in the left sidebar
+   - Click "Add stack"
+
+3. **Create the Riparr Stack**
+   - **Name**: Enter `riparr` as the stack name
+   - **Repository URL**: If using Git repository method:
+     - Repository URL: `https://github.com/your-username/riparr.git`
+     - Repository reference: `main` (or your default branch)
+     - Compose path: `docker-compose.yml`
+   - **Web editor**: Alternatively, copy and paste the contents of `docker-compose.yml`
+
+4. **Configure Environment Variables**
+   - In the "Environment variables" section, add the following variables:
+   
+   ```env
+   # Redis Configuration
+   REDIS_URL=redis://redis:6379
+   REDIS_PORT=6379
+   
+   # Service Toggles
+   ENABLE_ENHANCE=true
+   ENABLE_TRANSCODE=true
+   ENABLE_BLACKHOLE=true
+   
+   # GPU and Processing Settings
+   GPU_VENDOR=amd
+   ESRGAN_PROFILE=amd-4x-med-vram4
+   VAAPI_PROFILE=hevc_vaapi
+   TRANSCODE_PROFILE=high
+   CPU_FALLBACK=false
+   
+   # Directory Paths (container paths)
+   WATCH_PATH=/data
+   ENHANCED_OUTPUT_DIR=/data/enhanced
+   MKV_OUTPUT_DIR=/data/rips
+   TRANSCODED_OUTPUT_DIR=/data/transcoded
+   MODELS_DIR=/models
+   BLACKHOLE_PATH=/media/plex
+   CONFIG_PATH=/config/config.yaml
+   
+   # Media Processing Options
+   TITLE_SELECTION=all
+   SUBTITLE_POLICY=retain
+   AUDIO_POLICY=retain
+   AUDIO_FORMAT=aac
+   
+   # Service Configuration
+   CLEANUP=true
+   UI_PORT=8080
+   LOG_STREAM_PORT=9000
+   OLLAMA_PORT=11434
+   OLLAMA_MODEL=llama3.0
+   VAAPI=1
+   ```
+
+5. **Deploy the Stack**
+   - Click "Deploy the stack"
+   - Monitor the deployment progress in the "Logs" tab
+
+6. **Verify Deployment**
+   - Check the "Containers" section to ensure all services are running
+   - Access the web UI at `http://your-host:8080`
+   - View logs through Portainer's container logs interface
+
+#### Portainer-Specific Features
+
+- **Service Organization**: All services are labeled with `com.docker.compose.project=riparr` for easy identification
+- **Access Control**: Services include `io.portainer.accesscontrol.teams=admin` labels for team-based access control
+- **Network Isolation**: Services are organized into `frontend`, `backend`, and `data` networks for security
+- **Environment Configuration**: All variables can be modified through Portainer's UI without editing files
+- **Volume Management**: Named volumes are created with project labels for easy management
+
+#### Managing the Stack in Portainer
+
+- **Update Services**: Use "Pull and redeploy" to update to latest images
+- **Environment Changes**: Edit environment variables directly in Portainer
+- **Logs**: View real-time logs for any service through the Portainer interface
+- **Scaling**: Scale services up or down as needed
+- **Backup**: Export stack configuration for backup purposes
+
+### Accessing the Application
+
+- **Web UI**: Open `http://localhost:8080` in your browser
+- **API Endpoints**: Available at `http://localhost:8080/api/*`
+- **Logs**: View real-time logs in the UI or via Docker commands
+
+### Troubleshooting
+
+#### Common Issues
+
+1. **GPU Not Detected**
+   - Ensure GPU drivers are installed and up-to-date
+   - Verify Docker GPU support is enabled
+   - Check device permissions: `ls -la /dev/dri/`
+   - For NVIDIA: Install nvidia-docker2
+
+2. **Optical Drive Not Accessible**
+   - On Linux: Add user to `cdrom` group: `sudo usermod -aG cdrom $USER`
+   - Ensure drive is not mounted by host system
+   - Check device permissions and ownership
+
+3. **Container Startup Failures**
+   - Check logs: `docker compose logs <service>`
+   - Verify environment variables are set correctly
+   - Ensure required directories exist and are writable
+   - Check for port conflicts
+
+4. **MakeMKV License Issues**
+   - Obtain a valid MakeMKV beta key from https://www.makemkv.com/forum/viewtopic.php?t=1053
+   - Set `MAKEMKV_KEY` in `.env` file
+   - Restart rip_worker service
+
+5. **Ollama Connection Errors**
+   - Ensure Ollama is running on host: `ollama serve`
+   - Verify `OLLAMA_BASE_URL` points to correct host/port
+   - Pull required model: `ollama pull llama2`
+
+6. **Permission Errors**
+   - Ensure data directories are writable by Docker user (UID 1000 typically)
+   - On Windows: Check Docker Desktop file sharing settings
+   - On Linux: Adjust directory permissions: `chmod 755 /path/to/data`
+
+7. **High CPU/Memory Usage**
+   - Monitor resource usage: `docker stats`
+   - Adjust service toggles in `.env` to disable unused features
+   - Consider hardware upgrades for intensive workloads
+
+#### Debugging Steps
+
+1. **Check Service Health**
+   ```bash
+   docker compose ps
+   ```
+
+2. **Inspect Container**
+   ```bash
+   docker compose exec orchestrator bash
+   ```
+
+3. **View Detailed Logs**
+   ```bash
+   docker compose logs --tail=100 -f <service>
+   ```
+
+4. **Reset Environment**
+   ```bash
+   docker compose down -v
+   docker system prune -a
+   docker compose up --build -d
+   ```
+
+#### Getting Help
+
+- Check existing GitHub issues for similar problems
+- Provide detailed logs and system information when reporting issues
+- Include your Docker version, OS, and hardware specs
+
+## Development Workflow
+
+- **Documentation** – Keep all design docs in the `docs/` folder. Update the markdown files as the architecture evolves.
+- **To‑Do Tracking** – Edit `docs/todo.md` to reflect progress. The table uses simple status keywords (`Pending`, `In Progress`, `Completed`).
+- **Testing** – Follow the validation steps in `docs/validation.md`. Add results to `validation_results/`.
+- **Adding New Services** – Create a new service directory, add its Docker definition to `docker-compose.yml`, and update `docs/services.md` with the contract.
+
+## Git Repository Setup
+
+```bash
+# Initialise a new repository (if not already)
+git init
+git add .
+git commit -m "Initial commit – documentation and skeleton"
+
+# Create a .gitignore (example)
+cat > .gitignore <<'EOF'
+# Docker artefacts
+docker-compose.override.yml
+*.log
+
+# Media files
+data/
+validation_results/
+
+# Secrets
+.env
+EOF
+
+git add .gitignore
+git commit -m "Add .gitignore"
+
+# Optional: set up a remote
+git remote add origin https://github.com/your‑username/riparr.git
+git push -u origin master
+```
+
+Use feature branches for new services or major changes, and open pull requests to review updates to documentation and code.
+
+## License
+
+This project is licensed under the **MIT License** – see the `LICENSE` file for details.
+
+---riparr–automated-media-ripping-&-enhancement
 
 **Riparr** is a self‑hosted, micro‑service pipeline that converts physical optical media into high‑quality, AI‑upscaled streams. It watches for inserted drives, rips discs with MakeMKV, upscales video using Real‑ESRGAN (AMD‑first), transcodes to HEVC via VAAPI, enriches metadata with a local LLM (Ollama), and delivers the result to a user‑specified library. All components run in Docker containers and communicate via Redis Streams.
 
@@ -268,6 +487,103 @@ Before deploying Riparr, ensure your system meets the following requirements:
    docker compose down --rmi all
    ```
 
+### Portainer Deployment
+
+Portainer provides a web-based UI for managing Docker containers and stacks. The updated `docker-compose.yml` is fully compatible with Portainer and includes proper labels for organization and environment variable configuration.
+
+#### Prerequisites for Portainer Deployment
+
+- Portainer CE or EE installed and running
+- Access to Portainer web interface
+- Docker environment configured in Portainer
+
+#### Stack Creation Steps
+
+1. **Access Portainer Web Interface**
+   - Open your Portainer instance in a web browser
+   - Log in with your administrator credentials
+
+2. **Navigate to Stacks**
+   - Click on "Stacks" in the left sidebar
+   - Click "Add stack"
+
+3. **Create the Riparr Stack**
+   - **Name**: Enter `riparr` as the stack name
+   - **Repository URL**: If using Git repository method:
+     - Repository URL: `https://github.com/your-username/riparr.git`
+     - Repository reference: `main` (or your default branch)
+     - Compose path: `docker-compose.yml`
+   - **Web editor**: Alternatively, copy and paste the contents of `docker-compose.yml`
+
+4. **Configure Environment Variables**
+   - In the "Environment variables" section, add the following variables:
+   
+   ```env
+   # Redis Configuration
+   REDIS_URL=redis://redis:6379
+   REDIS_PORT=6379
+   
+   # Service Toggles
+   ENABLE_ENHANCE=true
+   ENABLE_TRANSCODE=true
+   ENABLE_BLACKHOLE=true
+   
+   # GPU and Processing Settings
+   GPU_VENDOR=amd
+   ESRGAN_PROFILE=amd-4x-med-vram4
+   VAAPI_PROFILE=hevc_vaapi
+   TRANSCODE_PROFILE=high
+   CPU_FALLBACK=false
+   
+   # Directory Paths (container paths)
+   WATCH_PATH=/data
+   ENHANCED_OUTPUT_DIR=/data/enhanced
+   MKV_OUTPUT_DIR=/data/rips
+   TRANSCODED_OUTPUT_DIR=/data/transcoded
+   MODELS_DIR=/models
+   BLACKHOLE_PATH=/media/plex
+   CONFIG_PATH=/config/config.yaml
+   
+   # Media Processing Options
+   TITLE_SELECTION=all
+   SUBTITLE_POLICY=retain
+   AUDIO_POLICY=retain
+   AUDIO_FORMAT=aac
+   
+   # Service Configuration
+   CLEANUP=true
+   UI_PORT=8080
+   LOG_STREAM_PORT=9000
+   OLLAMA_PORT=11434
+   OLLAMA_MODEL=llama3.0
+   VAAPI=1
+   ```
+
+5. **Deploy the Stack**
+   - Click "Deploy the stack"
+   - Monitor the deployment progress in the "Logs" tab
+
+6. **Verify Deployment**
+   - Check the "Containers" section to ensure all services are running
+   - Access the web UI at `http://your-host:8080`
+   - View logs through Portainer's container logs interface
+
+#### Portainer-Specific Features
+
+- **Service Organization**: All services are labeled with `com.docker.compose.project=riparr` for easy identification
+- **Access Control**: Services include `io.portainer.accesscontrol.teams=admin` labels for team-based access control
+- **Network Isolation**: Services are organized into `frontend`, `backend`, and `data` networks for security
+- **Environment Configuration**: All variables can be modified through Portainer's UI without editing files
+- **Volume Management**: Named volumes are created with project labels for easy management
+
+#### Managing the Stack in Portainer
+
+- **Update Services**: Use "Pull and redeploy" to update to latest images
+- **Environment Changes**: Edit environment variables directly in Portainer
+- **Logs**: View real-time logs for any service through the Portainer interface
+- **Scaling**: Scale services up or down as needed
+- **Backup**: Export stack configuration for backup purposes
+
 ### Accessing the Application
 
 - **Web UI**: Open `http://localhost:8080` in your browser
@@ -389,5 +705,3 @@ Use feature branches for new services or major changes, and open pull requests t
 This project is licensed under the **MIT License** – see the `LICENSE` file for details.
 
 ---
-
-*For any questions or contributions, please open an issue or submit a pull request on the GitHub repository.*
