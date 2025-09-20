@@ -65,16 +65,12 @@ graph LR
 ### Deployment Workflow Diagram
 ```mermaid
 flowchart TD
-    A[Start: Open Portainer UI] --> B[Verify Docker Endpoint]
-    B --> C[Create New Stack]
-    C --> D[Select Git Repository]
-    D --> E[Configure Env Variables]
-    E --> F[Set Advanced Options (optional)]
-    F --> G[Deploy Stack]
-    G --> H[Portainer Clones Repo & Builds Images]
-    H --> I[Containers Started]
-    I --> J[Verification Steps]
-    J --> K[Deployment Complete]
+    A[Start] --> B{Check Advanced Options (optional)}
+    B -->|Yes| C[Enable Feature X]
+    B -->|No| D[Skip Feature X]
+    C --> E[Proceed]
+    D --> E
+    E --> F[End]
 ```
 
 ---
