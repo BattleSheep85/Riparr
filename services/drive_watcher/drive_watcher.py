@@ -1,11 +1,24 @@
-import pyudev
-import redis
+"""Drive Watcher Service.
+
+Monitors optical drive insertion and ejection events using udev,
+publishes 'insert' and 'eject' events to the 'drive_events' Redis stream.
+"""
+
 import json
-import uuid
+import logging
 import os
 import sys
-import logging
+import uuid
 from typing import Dict
+
+import redis
+
+try:
+    import pyudev
+except ImportError:
+    pyudev = None
+    print("pyudev not available, drive watcher disabled")
+    sys.exit(1)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -25,6 +38,7 @@ r = redis.from_url(redis_url, decode_responses=True)
 drive_ids: Dict[str, str] = {}
 
 def device_event(device) -> None:
+    """Handle udev device events for optical drives."""
     action = device.action
     dev_path = device.device_node
     is_optical = device.get('ID_CDROM') == '1'
@@ -41,7 +55,7 @@ def device_event(device) -> None:
             "event": "insert"
         }
         r.xadd('drive_events', {'data': json.dumps(msg)})
-        logger.info(f"Published insert for {dev_path}")
+        logger.info("Published insert for %s", dev_path)
 
     elif action == 'remove':
         if dev_path in drive_ids:
@@ -52,24 +66,35 @@ def device_event(device) -> None:
             }
             r.xadd('drive_events', {'data': json.dumps(msg)})
             del drive_ids[dev_path]
-            logger.info(f"Published eject for {dev_path}")
+            logger.info("Published eject for %s", dev_path)
 
-# Set up udev monitor
-context = pyudev.Context()
-monitor = pyudev.Monitor.from_netlink(context)
-monitor.filter_by('block')
+def main() -> None:
+    """Main function to set up udev monitor and start observing."""
+    if pyudev is None:
+        logger.error("pyudev not available")
+        return
 
-observer = pyudev.MonitorObserver(monitor, device_event)
-observer.start()
+    # Set up udev monitor
+    context = pyudev.Context()
+    monitor = pyudev.Monitor.from_netlink(context)
+    monitor.filter_by('block')
 
-logger.info("Drive Watcher started, monitoring optical drives...")
+    observer = pyudev.MonitorObserver(monitor, device_event)
+    observer.start()
 
-# Keep the script running
-try:
-    observer.join()
-except KeyboardInterrupt:
-    observer.stop()
-    logger.info("Drive Watcher stopped.")
-except Exception as e:
-    logger.error(f"Unexpected error in drive watcher: {e}")
-    observer.stop()
+    logger.info("Drive Watcher started, monitoring optical drives...")
+
+    # Keep the script running
+    try:
+        observer.join()
+    except KeyboardInterrupt:
+        observer.stop()
+        logger.info("Drive Watcher stopped.")
+    except (OSError, RuntimeError) as e:
+        logger.error("Unexpected error in drive watcher: %s", e)
+        observer.stop()
+
+if __name__ == '__main__':
+    main()
+
+    # Add final newline

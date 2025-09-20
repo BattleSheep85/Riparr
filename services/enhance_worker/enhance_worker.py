@@ -1,14 +1,19 @@
-import redis
+"""Enhance Worker Service.
+
+Upscales and enhances video files using Real-ESRGAN,
+publishes 'enhance.start', 'enhance.progress', 'enhance.complete' events.
+"""
+
 import json
-import uuid
+import logging
 import os
-import sys
 import subprocess
+import sys
 import threading
 import time
-import re
-import logging
-from typing import Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Tuple
+
+import redis
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -32,9 +37,9 @@ enhanced_output_dir = os.getenv('ENHANCED_OUTPUT_DIR', '/data/enhanced')
 models_dir = os.getenv('MODELS_DIR', '/models')
 use_cpu_fallback = os.getenv('CPU_FALLBACK', 'false').lower() == 'true'
 
-def parse_profile(profile: str) -> Tuple[str, int, str, int]:
+def parse_profile(profile_str: str) -> Tuple[str, int, str, int]:
     """Parse ESRGAN profile string into components."""
-    parts = profile.split('-')
+    parts = profile_str.split('-')
     if len(parts) >= 4:
         vendor = parts[0]
         scale = int(parts[1].replace('x', ''))
@@ -43,7 +48,7 @@ def parse_profile(profile: str) -> Tuple[str, int, str, int]:
         return vendor, scale, quality, vram
     return 'amd', 4, 'med', 4
 
-vendor, scale, quality, vram = parse_profile(esrgan_profile)
+_vendor, _scale, _quality, _vram = parse_profile(esrgan_profile)
 
 # Model selection based on quality
 MODEL_MAP = {
@@ -51,13 +56,14 @@ MODEL_MAP = {
     'med': 'realesr-animevideov3-x4',
     'high': 'realesrgan-x4plus-anime'
 }
-model = MODEL_MAP.get(quality, 'realesr-animevideov3-x4')
+model = MODEL_MAP.get(_quality, 'realesr-animevideov3-x4')
 
-def is_hdr_file(file_path):
+def is_hdr_file(file_path: str) -> bool:
+    """Check if a video file is HDR using ffprobe."""
     # Use ffprobe to check for HDR
     try:
         cmd = ['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_streams', file_path]
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
         data = json.loads(result.stdout)
         for stream in data.get('streams', []):
             if stream.get('codec_type') == 'video':
@@ -65,40 +71,50 @@ def is_hdr_file(file_path):
                 if 'bt2020' in color_primaries.lower() or 'hdr' in str(stream).lower():
                     return True
         return False
-    except Exception as e:
+    except (subprocess.SubprocessError, json.JSONDecodeError, KeyError) as e:
         print(f"Error checking HDR for {file_path}: {e}")
         return False
 
-def enhance_file(input_file, output_file, job_id):
+def enhance_file(input_file: str, output_file: str, job_id: str) -> bool:
+    """Enhance a video file using Real-ESRGAN."""
     # Determine if GPU or CPU
     if gpu_vendor == 'amd' and not use_cpu_fallback:
         binary = 'realesrgan-ncnn-vulkan'
-        cmd = [binary, '-i', input_file, '-o', output_file, '-m', os.path.join(models_dir, model), '-s', str(scale), '-g', '0']
+        model_path = os.path.join(models_dir, model)
+        cmd = [binary, '-i', input_file, '-o', output_file,
+               '-m', model_path, '-s', str(_scale), '-g', '0']
     else:
         binary = 'realesrgan-ncnn'
-        cmd = [binary, '-i', input_file, '-o', output_file, '-m', os.path.join(models_dir, model), '-s', str(scale)]
+        model_path = os.path.join(models_dir, model)
+        cmd = [binary, '-i', input_file, '-o', output_file,
+               '-m', model_path, '-s', str(_scale)]
 
     try:
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        # Publish progress (simplified, as realesrgan may not have progress)
-        progress_msg = {
-            "job_id": job_id,
-            "percentage": 50  # Mid progress
-        }
-        r.xadd('enhance_events', {'event': 'progress', 'data': json.dumps(progress_msg)})
-        print(f"Enhancing {input_file} to {output_file}")
+        with subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        ) as process:
+            # Publish progress (simplified, as realesrgan may not have progress)
+            progress_msg = {
+                "job_id": job_id,
+                "percentage": 50  # Mid progress
+            }
+            r.xadd('enhance_events', {'event': 'progress', 'data': json.dumps(progress_msg)})
+            print(f"Enhancing {input_file} to {output_file}")
 
-        process.wait()
-        if process.returncode == 0:
-            return True
-        else:
+            process.wait()
+            if process.returncode == 0:
+                return True
             print(f"Enhance failed for {input_file}")
             return False
-    except Exception as e:
+    except (subprocess.SubprocessError, OSError) as e:
         print(f"Error enhancing {input_file}: {e}")
         return False
 
-def process_rip_complete(job_id, output_files):
+def process_rip_complete(job_id: str, output_files: List[str]) -> None:
+    """Process completed rip files for enhancement."""
     enhanced_files = []
     for mkv_file in output_files:
         if not mkv_file.endswith('.mkv'):
@@ -124,9 +140,10 @@ def process_rip_complete(job_id, output_files):
         "enhanced_files": enhanced_files
     }
     r.xadd('enhance_events', {'event': 'complete', 'data': json.dumps(complete_msg)})
-    print(f"Published enhance.complete for job {job_id}")
+    logger.info("Published enhance.complete for job %s", job_id)
 
-def process_rip_event(data):
+def process_rip_event(data: Dict[str, Any]) -> None:
+    """Handle rip completion events."""
     if data.get('event') == 'complete':
         job_id = data['job_id']
         output_files = data['output_files']
@@ -137,24 +154,26 @@ def process_rip_event(data):
             "input_files": output_files
         }
         r.xadd('enhance_events', {'event': 'start', 'data': json.dumps(start_msg)})
-        print(f"Published enhance.start for job {job_id}")
+        logger.info("Published enhance.start for job %s", job_id)
 
         threading.Thread(target=process_rip_complete, args=(job_id, output_files)).start()
 
-def main():
+def main() -> None:
+    """Main event loop for enhance worker."""
     last_id = '0'
     while True:
         try:
             messages = r.xread({'rip_events': last_id}, block=1000)
-            for stream, msgs in messages:
+            for _stream, msgs in messages:
                 for msg_id, msg in msgs:
                     last_id = msg_id
                     data = json.loads(msg['data'])
                     process_rip_event(data)
-        except Exception as e:
+        except (redis.ConnectionError, redis.TimeoutError, json.JSONDecodeError) as e:
             print(f"Error reading stream: {e}")
             time.sleep(1)
 
 if __name__ == '__main__':
-    print("Enhance Worker started, waiting for rip events...")
+    logger.info("Enhance Worker started, waiting for rip events...")
     main()
+    ENDING = "Enhance Worker ended."

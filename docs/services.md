@@ -49,10 +49,13 @@ These updates reduce code size by roughly 15 % in the affected services and en
 
 ## Blackhole Integration
 - **Purpose**: Move final media files to a user‑specified drop directory (e.g., Plex library) and optionally create side‑car files.
-- **Contract**: Consumes `metadata.complete`, performs filesystem move, emits `blackhole.complete`.
+- **Contract**: Consumes `metadata.complete` events, moves files, creates `.nfo` side‑cars, and emits `blackhole.start` / `blackhole.complete` events on the `blackhole_events` Redis stream.
 - **Implementation**: Python script [`services/blackhole_integration/blackhole_integration.py`](services/blackhole_integration/blackhole_integration.py:1) with Dockerfile [`services/blackhole_integration/Dockerfile`](services/blackhole_integration/Dockerfile:1).
-- **Key Env Vars**: `BLACKHOLE_PATH`, `CLEANUP`, `REDIS_URL`.
-- **Entry Point**: Consumes `metadata.complete`, moves final media files, optionally creates `.nfo` side‑car, publishes `blackhole.complete`.
+- **Key Env Vars**:
+  - `ENABLE_BLACKHOLE` – Set to `true` to enable the service (default `false`).
+  - `BLACKHOLE_PATH` – Destination directory for moved media (default `/media/plex`).
+  - `REDIS_URL` – Redis connection string (default `redis://redis:6379`).
+- **Entry Point**: Listens on the `metadata_events` stream, processes `metadata.complete` messages, moves files, creates side‑cars, and publishes `blackhole.start` / `blackhole.complete` events.
 
 ## UI Gateway
 - **Purpose**: Serve a web UI that displays job lists, live logs, and control actions (pause, cancel, toggle services).

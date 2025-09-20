@@ -1,98 +1,120 @@
-import redis
+"""Metadata Worker Service.
+
+Listens for transcode completion events, normalizes movie titles via Ollama,
+writes metadata side-car JSON files, and publishes metadata.start / metadata.complete
+events through Redis streams.
+"""
+
 import json
 import os
 import sys
-import ollama
+import time
+from typing import Any, Dict, List
 
-# Check if service is enabled
-enable = os.getenv('ENABLE_METADATA', 'false').lower() == 'true'
-if not enable:
+# Third-party
+try:  # Ollama is optional in some environments
+    import ollama  # type: ignore
+except ImportError:  # pragma: no cover
+    ollama = None  # type: ignore
+
+import redis
+
+# Service toggle
+ENABLE = os.getenv("ENABLE_METADATA", "false").lower() == "true"
+if not ENABLE:
     print("Metadata Worker disabled, exiting.")
     sys.exit(0)
 
 # Redis connection
-redis_url = os.getenv('REDIS_URL', 'redis://redis:6379')
-r = redis.from_url(redis_url, decode_responses=True)
+REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
+r = redis.from_url(REDIS_URL, decode_responses=True)
 
 # Config
-ollama_model = os.getenv('OLLAMA_MODEL', 'llama2')
-metadata_dir = os.getenv('METADATA_DIR', '/data/metadata')
-os.makedirs(metadata_dir, exist_ok=True)
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama2")
+METADATA_DIR = os.getenv("METADATA_DIR", "/data/metadata")
+os.makedirs(METADATA_DIR, exist_ok=True)
 
-def normalize_title(filename):
-    # Extract title from filename
+
+def normalize_title(filename: str) -> Dict[str, str]:
+    """Return normalized title metadata for *filename* using Ollama (with graceful fallback)."""
     title = os.path.splitext(filename)[0]
-    
-    # Call Ollama
-    prompt = f"Normalize this movie title: '{title}'. Provide a clean title, year if available, directory structure like /Movies/Title (Year)/, and file pattern like Title (Year).mkv. Respond in JSON format with keys: normalized_title, directory, file_pattern."
-    
-    try:
-        response = ollama.chat(model=ollama_model, messages=[{'role': 'user', 'content': prompt}])
-        content = response['message']['content']
-        # Parse JSON
-        metadata = json.loads(content)
-        return metadata
-    except Exception as e:
-        print(f"Error calling Ollama: {e}")
+
+    if ollama is None:
         return {
-            'normalized_title': title,
-            'directory': '/Movies/',
-            'file_pattern': f"{title}.mkv"
+            "normalized_title": title,
+            "directory": "/Movies/",
+            "file_pattern": f"{title}.mkv",
         }
 
-def process_transcode_complete(job_id, transcoded_files):
-    metadata_list = []
+    prompt = (
+        f"Normalize this movie title: '{title}'. "
+        "Provide a clean title, year if available, directory structure like "
+        "/Movies/Title (Year)/, and file pattern like Title (Year).mkv. "
+        "Respond in JSON format with keys: normalized_title, directory, file_pattern."
+    )
+
+    try:
+        response = ollama.chat(model=OLLAMA_MODEL, messages=[{"role": "user", "content": prompt}])
+        return json.loads(response["message"]["content"])
+    except (json.JSONDecodeError, KeyError, TypeError) as err:
+        print(f"Ollama error: {err}")
+        return {
+            "normalized_title": title,
+            "directory": "/Movies/",
+            "file_pattern": f"{title}.mkv",
+        }
+
+
+def process_transcode_complete(job_id: str, transcoded_files: List[str]) -> None:
+    """Generate metadata for *transcoded_files* and publish completion event."""
+    metadata_list: List[Dict[str, Any]] = []
+
     for file_path in transcoded_files:
         filename = os.path.basename(file_path)
         metadata = normalize_title(filename)
-        metadata['original_file'] = file_path
-        metadata['job_id'] = job_id
+        metadata.update({"original_file": file_path, "job_id": job_id})
         metadata_list.append(metadata)
-        
-        # Create side-car JSON
-        json_path = os.path.join(metadata_dir, f"{job_id}_{filename}.json")
-        with open(json_path, 'w') as f:
-            json.dump(metadata, f, indent=2)
-    
-    # Publish complete
-    complete_msg = {
-        "job_id": job_id,
-        "metadata": metadata_list
-    }
-    r.xadd('metadata_events', {'event': 'complete', 'data': json.dumps(complete_msg)})
+
+        json_path = os.path.join(METADATA_DIR, f"{job_id}_{filename}.json")
+        with open(json_path, "w", encoding="utf-8") as fp:
+            json.dump(metadata, fp, indent=2)
+
+    complete_msg = {"job_id": job_id, "metadata": metadata_list}
+    r.xadd("metadata_events", {"event": "complete", "data": json.dumps(complete_msg)})
     print(f"Published metadata.complete for job {job_id}")
 
-def process_transcode_event(data):
-    if data.get('event') == 'complete':
-        job_id = data['job_id']
-        transcoded_files = data['transcoded_files']
-        
-        # Publish start
-        start_msg = {
-            "job_id": job_id,
-            "input_files": transcoded_files
-        }
-        r.xadd('metadata_events', {'event': 'start', 'data': json.dumps(start_msg)})
-        print(f"Published metadata.start for job {job_id}")
-        
-        # Process
-        process_transcode_complete(job_id, transcoded_files)
 
-def main():
-    last_id = '0'
+def process_transcode_event(data: Dict[str, Any]) -> None:
+    """Handle a single transcode event record."""
+    if data.get("event") != "complete":
+        return
+
+    job_id = data["job_id"]
+    transcoded_files = data["transcoded_files"]
+
+    start_msg = {"job_id": job_id, "input_files": transcoded_files}
+    r.xadd("metadata_events", {"event": "start", "data": json.dumps(start_msg)})
+    print(f"Published metadata.start for job {job_id}")
+
+    process_transcode_complete(job_id, transcoded_files)
+
+
+def main() -> None:
+    """Event-loop: consume transcode_events Redis stream indefinitely."""
+    last_id = "0"
     while True:
         try:
-            messages = r.xread({'transcode_events': last_id}, block=1000)
-            for stream, msgs in messages:
+            messages = r.xread({"transcode_events": last_id}, block=1000)
+            for _stream, msgs in messages:
                 for msg_id, msg in msgs:
                     last_id = msg_id
-                    data = json.loads(msg['data'])
+                    data = json.loads(msg["data"])
                     process_transcode_event(data)
-        except Exception as e:
-            print(f"Error reading stream: {e}")
-            import time
+        except (redis.ConnectionError, json.JSONDecodeError) as err:
+            print(f"Stream read error: {err}")
             time.sleep(1)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     print("Metadata Worker started, waiting for transcode events...")
     main()

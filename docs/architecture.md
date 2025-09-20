@@ -6,21 +6,21 @@ The **Riparr** project is a modular, micro‑service system that automates the f
 
 ```
 +----------------+      +----------------+      +----------------+      +----------------+
-| Drive Watcher  | ---> | Rip Worker     | ---> | Enhance Worker | ---> | Serve Worker |
+| Drive Watcher  | ---> | Rip Worker     | ---> | Enhance Worker | ---> | UI Gateway |
 +----------------+      +----------------+      +----------------+      +----------------+
-       |                       |                       |                       |
-       v                       v                       v                       v
-  +-----------+          +-----------+          +-----------+          +-----------+
-  |  Redis    |<--------|  Redis    |<--------|  Redis    |<--------|  Redis    |
-  +-----------+          +-----------+          +-----------+          +-----------+
-       ^                       ^                       ^                       ^
-       |                       |                       |                       |
-  +-----------+          +-----------+          +-----------+          +-----------+
-  |   UI      |          |  Log      |          |  Config   |          |  Blackhole|
-  +-----------+          +-----------+          +-----------+          +-----------+
+      |                       |                       |                       |
+      v                       v                       v                       v
+ +-----------+          +-----------+          +-----------+          +-----------+
+ |  Redis    |<--------|  Redis    |<--------|  Redis    |<--------|  Redis    |
+ +-----------+          +-----------+          +-----------+          +-----------+
+      ^                       ^                       ^                       ^
+      |                       |                       |                       |
+ +-----------+          +-----------+          +-----------+          +-----------+
+ |   UI      |          |  Log      |          |  Config   |          |  Blackhole|
+ +-----------+          +-----------+          +-----------+          +-----------+
 ```
 
-The system uses **Docker Compose** to orchestrate containers, **Redis Streams** for event‑driven messaging, and **GPU‑accelerated** processing (AMD VAAPI first, later NVIDIA/Intel). All services are stateless except for persistent configuration and job metadata stored in Redis.
+The system uses **Docker Compose** to orchestrate containers, **Redis Streams** for event‑driven messaging, and **GPU‑accelerated** processing (AMD VAAPI first, later NVIDIA/Intel). All services are stateless except for persistent configuration and job metadata stored in Redis. The UI Gateway serves the web UI and streams logs, while the Log Stream Service centralizes JSON‑line logs from all containers.
 
 ### Core Principles
 
