@@ -4,22 +4,25 @@
 *Last updated: 2025‑09‑19*
 
 ## Table of Contents
+
 1. [Overview](#overview)
 2. [Prerequisites](#prerequisites)
 3. [Repository Preparation](#repository-preparation)
 4. [Portainer Deployment Steps](#portainer-deployment-steps)
 5. [Verification](#verification)
 6. [Troubleshooting](#troubleshooting)
-7. [Post‑Deployment Checklist](#post‑deployment-checklist)
+7. [Post‑Deployment Checklist](#post-deployment-checklist)
 8. [Updating the Stack](#updating-the-stack)
 9. [References](#references)
 
 ---
 
 ## Overview
-The **Riparr** project consists of **11 micro‑services** orchestrated with a single `docker‑compose.yml` file. This guide explains how to deploy the entire stack **exclusively through Portainer’s web GUI**, using Portainer’s **Git repository integration** to handle build contexts and local file mounts automatically—no command‑line interaction required.
+
+The **Riparr** project consists of **11 micro‑services** orchestrated with a single `docker‑compose.yml` file. This guide explains how to deploy the entire stack **exclusively through Portainer's web GUI**, using Portainer's **Git repository integration** to handle build contexts and local file mounts automatically—no command‑line interaction required.
 
 ### Architecture Diagram
+
 ```mermaid
 graph LR
     subgraph Frontend
@@ -63,9 +66,10 @@ graph LR
 ```
 
 ### Deployment Workflow Diagram
+
 ```mermaid
 flowchart TD
-    A[Start] --> B{Check Advanced Options (optional)}
+    A[Start] --> B{"Check Advanced Options"}
     B -->|Yes| C[Enable Feature X]
     B -->|No| D[Skip Feature X]
     C --> E[Proceed]
@@ -76,21 +80,24 @@ flowchart TD
 ---
 
 ## Prerequisites
+
 | Item | Why needed | How to obtain / verify |
 |------|------------|------------------------|
 | Portainer server (web UI) | Provides GUI for stack creation, configuration, and monitoring | Install Portainer: <https://docs.portainer.io/start/install/server> |
-| Docker Engine (v20.10 or newer) | Executes containers built from the compose file | Verify with `docker version` (Portainer shows Engine version) |
+| Docker Engine (v20.10 or newer) | Executes containers built from the compose file | Verify with `docker version` (Portainer shows Engine version) |
 | Git repository URL (HTTPS/SSH) | Portainer pulls source code, including `docker‑compose.yml` and service directories | Push the `Riparr` folder to a remote Git provider (GitHub, GitLab, etc.) |
-| Access credentials (if private repo) | Portainer needs authentication to clone the repo | Create a Personal Access Token (PAT) or SSH key; add it under *Settings → Registries → Add registry* (choose “Git”) |
-| Portainer endpoint (Docker Engine) | Destination for the stack deployment | In Portainer → *Endpoints → Add endpoint* → select “Docker” |
+| Access credentials (if private repo) | Portainer needs authentication to clone the repo | Create a Personal Access Token (PAT) or SSH key; add it under *Settings → Registries → Add registry* (choose "Git") |
+| Portainer endpoint (Docker Engine) | Destination for the stack deployment | In Portainer → *Endpoints → Add endpoint* → select "Docker" |
 | Network ports (optional) | Services expose ports (e.g., UI gateway on 8080) | Ensure ports are open on host firewall or cloud security group |
 | Environment variables (see below) | Services rely on configuration values (DB connections, API keys) | Gather values from your environment (secrets manager, `.env` files, etc.) |
 
 ---
 
 ## Repository Preparation
+
 1. **Maintain exact directory layout** (relative to repository root):
-   ```
+
+   ```text
    ├─ docker-compose.yml
    ├─ services/
    │   ├─ blackhole_integration/
@@ -116,22 +123,28 @@ flowchart TD
    │       └─ public/
    └─ docs/ …
    ```
+
 2. Commit the latest `docker-compose.yml` and all service source files.  
 3. Push to the remote repository (e.g., `git push origin main`).  
 
 ---
 
 ## Portainer Deployment Steps
+
 ### 1. Log in to Portainer
+
 - Open `http://<PORTAINER_HOST>:9000` and sign in.
 
 ### 2. Verify Docker Endpoint
-- Navigate to **Endpoints**, add the Docker Engine if missing, and ensure it shows **“Up”**.
+
+- Navigate to **Endpoints**, add the Docker Engine if missing, and ensure it shows **"Up"**.
 
 ### 3. Create a New Stack
+
 - Go to **Stacks → Add stack**, name it (e.g., `riparr‑production`).
 
-### 4. Select “Git Repository”
+### 4. Select "Git Repository"
+
 | Field | Value |
 |-------|-------|
 | Method | **Git Repository** |
@@ -141,21 +154,25 @@ flowchart TD
 | Authentication | Add PAT/SSH key if repo is private |
 
 ### 5. Configure Environment Variables
+
 - Add each required variable (see **Services Overview** below).  
-- Use **Scope** = “All services” unless a variable is service‑specific.
+- Use **Scope** = "All services" unless a variable is service‑specific.
 
 ### 6. Advanced Options (optional)
+
 - **Pull image before deploy** – skip build if using pre‑built images.  
 - **Force rebuild** – rebuild images after code changes.  
-- **Restart policy** – set to “Always” for production.  
+- **Restart policy** – set to "Always" for production.  
 - **Log driver** – choose `json-file` or `syslog`.
 
 ### 7. Deploy
+
 - Click **Deploy the stack**. Portainer will clone the repo, build images, create networks/volumes, and start containers.  
 
 ---
 
 ## Services Overview (Key points)
+
 | Service | Build context | Ports | Volumes | Important env vars |
 |---------|---------------|-------|---------|--------------------|
 | ui_gateway | `services/ui_gateway` | `8080:8080` | `./services/ui_gateway/public:/app/public` | `UI_GATEWAY_PORT`, `API_BASE_URL` |
@@ -171,47 +188,53 @@ flowchart TD
 ---
 
 ## Verification
-1. **Containers** – In **Stacks → riparr‑production → Containers**, ensure all show **“Running”**.  
+
+1. **Containers** – In **Stacks → riparr‑production → Containers**, ensure all show **"Running"**.  
 2. **UI** – Open the console of `ui_gateway` and run `curl http://localhost:8080`; you should see the landing page.  
-3. **Logs** – Check each service’s **Logs** tab for startup errors.  
+3. **Logs** – Check each service's **Logs** tab for startup errors.  
 
 ---
 
 ## Troubleshooting
+
 | Symptom | Likely cause | Remedy |
 |---------|--------------|--------|
-| “Cannot locate Dockerfile” | Wrong `build:` path or missing file | Verify each service folder contains a `Dockerfile` and paths are correct in `docker-compose.yml`. |
-| “ENOENT: no such file or directory” | Bind‑mount host path missing | Ensure the referenced host directories exist in the repository (e.g., `services/ui_gateway/public`). |
-| Env var not recognized | Variable defined globally but needed per‑service | Set the variable’s **Scope** to the specific service. |
+| "Cannot locate Dockerfile" | Wrong `build:` path or missing file | Verify each service folder contains a `Dockerfile` and paths are correct in `docker-compose.yml`. |
+| "ENOENT: no such file or directory" | Bind‑mount host path missing | Ensure the referenced host directories exist in the repository (e.g., `services/ui_gateway/public`). |
+| Env var not recognized | Variable defined globally but needed per‑service | Set the variable's **Scope** to the specific service. |
 | Port conflict | Host already uses the same port | Change the host port mapping in `docker-compose.yml` or stop the conflicting service. |
-| npm “missing script: start” | `package.json` lacks a `start` script | Add a valid `start` script to the Node‑based services. |
+| npm "missing script: start" | `package.json` lacks a `start` script | Add a valid `start` script to the Node‑based services. |
 | Network issues | Services not attached to `riparr_net` | Confirm `networks:` section lists `riparr_net` and each service includes it. |
 | Pull image failed | Private registry credentials missing | Add the registry under **Settings → Registries** and reference it in image names. |
 | Empty logs | Logging driver mis‑configured | Set **Log driver** to `json-file` or configure a remote logging endpoint. |
 
 *Common Docker‑Compose errors in Portainer*  
-- **Insecure registry** – Add the registry URL to Docker daemon’s insecure list.  
+
+- **Insecure registry** – Add the registry URL to Docker daemon's insecure list.  
 - **Dependency not running** – Ensure dependent services are healthy; add healthchecks if needed.  
 - **Permission denied to Docker socket** – Run Portainer with `-v /var/run/docker.sock:/var/run/docker.sock` and add the user to the `docker` group.  
 
 ---
 
 ## Post‑Deployment Checklist
-- [ ] **Health checks** – Verify each service’s health endpoint returns `200 OK`.  
+
+- [ ] **Health checks** – Verify each service's health endpoint returns `200 OK`.  
 - [ ] **Backup** – Export the stack definition (Stacks → Export) and store in version control.  
-- [ ] **Monitoring** – Enable Portainer’s Metrics (Prometheus) for CPU, memory, restarts.  
+- [ ] **Monitoring** – Enable Portainer's Metrics (Prometheus) for CPU, memory, restarts.  
 - [ ] **Scaling** – Use the **Scale** button to increase replicas if needed.  
 
 ---
 
 ## Updating the Stack
+
 1. Push changes to the Git repository (code, Dockerfiles, etc.).  
 2. In Portainer, go to **Stacks → riparr‑production → Redeploy**.  
-3. Enable **“Force rebuild”** if you want to rebuild images regardless of changes.  
+3. Enable **"Force rebuild"** if you want to rebuild images regardless of changes.  
 
 ---
 
 ## References
+
 - Portainer Stacks docs: <https://docs.portainer.io/user/stacks>  
 - Docker Compose reference: <https://docs.docker.com/compose/compose-file/>  
 - Git authentication in Portainer: <https://docs.portainer.io/user/registries/git>  
@@ -220,11 +243,14 @@ flowchart TD
 
 *End of guide.*
 
-# Riparr – Automated Media Ripping & Enhancement
+---
+
+## Riparr – Automated Media Ripping & Enhancement
 
 **Riparr** is a self‑hosted, micro‑service pipeline that converts physical optical media into high‑quality, AI‑upscaled streams. It watches for inserted drives, rips discs with MakeMKV, upscales video using Real‑ESRGAN (AMD‑first), transcodes to HEVC via VAAPI, enriches metadata with a local LLM (Ollama), and delivers the result to a user‑specified library. All components run in Docker containers and communicate via Redis Streams.
 
-## Table of Contents
+### Contents
+
 - [Architecture Overview](docs/architecture.md)
 - [Service Definitions](docs/services.md)
 - [Validation & Test Plans](docs/validation.md)
@@ -236,7 +262,8 @@ flowchart TD
 
 ## Getting Started
 
-### Prerequisites
+### System Requirements
+
 Before deploying Riparr, ensure your system meets the following requirements:
 
 - **Docker**: Docker Desktop (Windows/Mac) or Docker Engine (Linux) version 20.10 or later. Enable GPU support for hardware acceleration.
@@ -256,12 +283,14 @@ Before deploying Riparr, ensure your system meets the following requirements:
 ### Installation and Setup
 
 1. **Clone the Repository**
+
    ```bash
    git clone https://github.com/your-username/riparr.git
    cd riparr
    ```
 
 2. **Create Required Directories**
+
    ```bash
    mkdir -p data/rips data/enhanced data/transcoded data/metadata validation_results
    ```
@@ -316,11 +345,13 @@ Before deploying Riparr, ensure your system meets the following requirements:
 ### Deployment Commands
 
 1. **Build and Start Services**
+
    ```bash
    docker compose up --build -d
    ```
 
 2. **View Logs**
+
    ```bash
    # All services
    docker compose logs -f
@@ -332,22 +363,26 @@ Before deploying Riparr, ensure your system meets the following requirements:
    ```
 
 3. **Stop Services**
+
    ```bash
    docker compose down
    ```
 
 4. **Restart Specific Service**
+
    ```bash
    docker compose restart rip_worker
    ```
 
 5. **Update Services**
+
    ```bash
    docker compose pull
    docker compose up -d
    ```
 
 6. **Clean Up**
+
    ```bash
    # Remove containers and volumes
    docker compose down -v
@@ -360,7 +395,7 @@ Before deploying Riparr, ensure your system meets the following requirements:
 
 Portainer provides a web-based UI for managing Docker containers and stacks. The updated `docker-compose.yml` is fully compatible with Portainer and includes proper labels for organization and environment variable configuration.
 
-#### Prerequisites for Portainer Deployment
+#### Setup Requirements for Portainer
 
 - Portainer CE or EE installed and running
 - Access to Portainer web interface
@@ -503,21 +538,25 @@ Portainer provides a web-based UI for managing Docker containers and stacks. The
 #### Debugging Steps
 
 1. **Check Service Health**
+
    ```bash
    docker compose ps
    ```
 
 2. **Inspect Container**
+
    ```bash
    docker compose exec orchestrator bash
    ```
 
 3. **View Detailed Logs**
+
    ```bash
    docker compose logs --tail=100 -f <service>
    ```
 
 4. **Reset Environment**
+
    ```bash
    docker compose down -v
    docker system prune -a
@@ -580,6 +619,7 @@ This project is licensed under the **MIT License** – see the `LICENSE` file fo
 The recent code simplification effort focused on improving maintainability, reducing redundancy, and enhancing error handling across the Python micro‑services.
 
 ### Key Improvements
+
 - **Dead Code Removal** – Unused variables and blocks (e.g., the `cleanup` flag in `blackhole_integration`) were eliminated.
 - **Structured Logging** – All `print` statements were replaced with the standard `logging` module (INFO, ERROR levels) for consistent log output.
 - **Type Hints** – Added comprehensive type annotations to function signatures and variable declarations, improving IDE support and static analysis.
@@ -587,4 +627,4 @@ The recent code simplification effort focused on improving maintainability, redu
 - **Redis Connection Standardization** – Unified Redis client creation using `redis.from_url()` across services.
 - **Documentation Updates** – All related documentation files (`docs/services.md`, `docs/validation.md`, `docs/todo.md`) were refreshed to reflect these changes.
 
-These updates reduce code size by ~15 % in affected files, improve readability, and lay the groundwork for future enhancements without altering existing functionality.
+These updates reduce code size by ~15 % in affected files, improve readability, and lay the groundwork for future enhancements without altering existing functionality.
